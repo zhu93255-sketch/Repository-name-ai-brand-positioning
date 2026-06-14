@@ -145,6 +145,63 @@ function drawTextBlock(
   return y + lines.length * lineHeight;
 }
 
+function normalizeShareText(text: string) {
+  return text
+    .replace(/[•·]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/，+/g, "，")
+    .trim();
+}
+
+function clampShareText(text: string, maxChars: number) {
+  const normalized = normalizeShareText(text);
+  const chars = Array.from(normalized);
+  if (chars.length <= maxChars) {
+    return normalized;
+  }
+
+  return `${chars.slice(0, Math.max(0, maxChars - 1)).join("")}…`;
+}
+
+function pickShortPositioning(strategy: BrandStrategy) {
+  const parts = strategy.brandPositioning.split(/[。！？!?\n]/).map((part) => part.trim()).filter(Boolean);
+  return clampShareText(parts[0] || strategy.brandPositioning, 30);
+}
+
+function buildPositioningTags(strategy: BrandStrategy) {
+  return [
+    ...strategy.coreSellingPoints,
+    ...strategy.userPersona.traits,
+    ...strategy.differentiationAdvantages,
+  ]
+    .map((item) => clampShareText(item, 8))
+    .filter((item, index, array) => item.length > 0 && array.indexOf(item) === index)
+    .slice(0, 3);
+}
+
+function buildCoreInsight(strategy: BrandStrategy) {
+  const positioning = pickShortPositioning(strategy).replace(/…$/, "");
+  const firstAdvantage = clampShareText(strategy.differentiationAdvantages[0] || strategy.coreSellingPoints[0], 16);
+  return clampShareText(`${positioning}，最值得强调的是${firstAdvantage}`, 36);
+}
+
+function buildShareSellingPoints(strategy: BrandStrategy) {
+  return strategy.coreSellingPoints.slice(0, 4).map((item) => clampShareText(item, 12));
+}
+
+function buildSharePersonaSummary(strategy: BrandStrategy) {
+  return clampShareText(strategy.userPersona.summary, 34);
+}
+
+function buildShareDifferentiators(strategy: BrandStrategy) {
+  return strategy.differentiationAdvantages.slice(0, 4).map((item) => clampShareText(item, 15));
+}
+
+function buildValueSummary(strategy: BrandStrategy) {
+  const firstPoint = clampShareText(strategy.coreSellingPoints[0] || "更清楚表达价值", 10);
+  return clampShareText(`你现在拿到了更清楚的定位表达、${firstPoint}和可直接开做的小红书内容方向。`, 48);
+}
+
 export function BrandStudio({
   openAiConfigured,
   openAiMessage,
@@ -372,86 +429,159 @@ export function BrandStudio({
       const leftX = SHARE_CARD_PADDING;
       const rightX = SHARE_CARD_WIDTH / 2 + 10;
       const columnWidth = SHARE_CARD_WIDTH / 2 - SHARE_CARD_PADDING - 26;
+      const positioningText = pickShortPositioning(strategy);
+      const positioningTags = buildPositioningTags(strategy);
+      const coreInsight = buildCoreInsight(strategy);
+      const shareSellingPoints = buildShareSellingPoints(strategy);
+      const sharePersonaSummary = buildSharePersonaSummary(strategy);
+      const shareDifferentiators = buildShareDifferentiators(strategy);
+      const valueSummary = buildValueSummary(strategy);
 
-      drawRoundedRect(ctx, leftX, contentTop, columnWidth, 310, 28, "#fffaf2", "#eadfce");
-      ctx.fillStyle = "#d96d35";
-      ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      ctx.fillText("品牌定位", leftX + 28, contentTop + 40);
-      ctx.font = "400 28px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      drawTextBlock(ctx, strategy.brandPositioning, leftX + 28, contentTop + 92, columnWidth - 56, 40, 5, "#202531");
-
-      drawRoundedRect(ctx, rightX, contentTop, columnWidth, 310, 28, "#16181d");
+      drawRoundedRect(
+        ctx,
+        SHARE_CARD_PADDING,
+        contentTop,
+        SHARE_CARD_WIDTH - SHARE_CARD_PADDING * 2,
+        172,
+        28,
+        "#16181d",
+      );
       ctx.fillStyle = "#ffb07d";
       ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      ctx.fillText("核心卖点", rightX + 28, contentTop + 40);
-      ctx.font = "400 26px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      strategy.coreSellingPoints.slice(0, 4).forEach((point, index) => {
-        const itemY = contentTop + 92 + index * 52;
-        ctx.fillStyle = "#ff8e55";
-        ctx.beginPath();
-        ctx.arc(rightX + 22, itemY - 8, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#f6f7fb";
-        drawTextBlock(ctx, point, rightX + 38, itemY, columnWidth - 60, 34, 2, "#f6f7fb");
+      ctx.fillText("核心洞察", SHARE_CARD_PADDING + 28, contentTop + 42);
+      ctx.fillStyle = "#f8f9fc";
+      ctx.font = "600 42px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      drawTextBlock(
+        ctx,
+        coreInsight,
+        SHARE_CARD_PADDING + 28,
+        contentTop + 106,
+        SHARE_CARD_WIDTH - SHARE_CARD_PADDING * 2 - 56,
+        50,
+        2,
+        "#f8f9fc",
+      );
+
+      const upperTop = contentTop + 198;
+      drawRoundedRect(ctx, leftX, upperTop, columnWidth, 282, 28, "#fffaf2", "#eadfce");
+      ctx.fillStyle = "#d96d35";
+      ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      ctx.fillText("一句话定位", leftX + 28, upperTop + 40);
+      ctx.fillStyle = "#202531";
+      ctx.font = "600 40px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      drawTextBlock(
+        ctx,
+        positioningText,
+        leftX + 28,
+        upperTop + 98,
+        columnWidth - 56,
+        48,
+        2,
+        "#202531",
+      );
+
+      positioningTags.forEach((tag, index) => {
+        const tagWidth = 96 + Math.min(Array.from(tag).length, 6) * 20;
+        const tagX = leftX + 28 + index * (tagWidth + 14);
+        drawRoundedRect(ctx, tagX, upperTop + 194, tagWidth, 42, 20, "#f4ecdf");
+        ctx.fillStyle = "#6d5d4d";
+        ctx.font = "600 20px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+        drawTextBlock(ctx, tag, tagX + 18, upperTop + 221, tagWidth - 36, 24, 1, "#6d5d4d");
       });
 
-      const lowerTop = contentTop + 338;
-      drawRoundedRect(ctx, leftX, lowerTop, columnWidth, 512, 28, "#16181d");
+      drawRoundedRect(ctx, rightX, upperTop, columnWidth, 282, 28, "#16181d");
+      ctx.fillStyle = "#ffb07d";
+      ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      ctx.fillText("核心卖点", rightX + 28, upperTop + 40);
+      const chipWidth = (columnWidth - 70) / 2;
+      shareSellingPoints.forEach((point, index) => {
+        const chipX = rightX + 22 + (index % 2) * (chipWidth + 14);
+        const chipY = upperTop + 86 + Math.floor(index / 2) * 78;
+        drawRoundedRect(ctx, chipX, chipY, chipWidth, 58, 22, "rgba(255,255,255,0.08)");
+        ctx.fillStyle = "#f7f8fb";
+        ctx.font = "600 24px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+        drawTextBlock(ctx, point, chipX + 18, chipY + 36, chipWidth - 36, 28, 1, "#f7f8fb");
+      });
+
+      const lowerTop = upperTop + 310;
+      drawRoundedRect(ctx, leftX, lowerTop, columnWidth, 430, 28, "#16181d");
       ctx.fillStyle = "#ffb07d";
       ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
       ctx.fillText("用户画像", leftX + 28, lowerTop + 40);
-      ctx.font = "400 26px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      ctx.fillStyle = "#f6f7fb";
+      ctx.font = "400 28px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
       let personaBottom = drawTextBlock(
         ctx,
-        strategy.userPersona.summary,
+        sharePersonaSummary,
         leftX + 28,
-        lowerTop + 88,
+        lowerTop + 90,
         columnWidth - 56,
-        36,
+        38,
         4,
         "#f6f7fb",
       );
 
-      personaBottom += 16;
+      personaBottom += 20;
       strategy.userPersona.traits.slice(0, 4).forEach((trait, index) => {
         const tagX = leftX + 28 + (index % 2) * ((columnWidth - 70) / 2 + 14);
         const tagY = personaBottom + Math.floor(index / 2) * 54;
         drawRoundedRect(ctx, tagX, tagY, (columnWidth - 70) / 2, 40, 18, "rgba(255,255,255,0.08)");
         ctx.fillStyle = "#e7eaf3";
         ctx.font = "500 20px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-        drawTextBlock(ctx, trait, tagX + 16, tagY + 26, (columnWidth - 70) / 2 - 32, 24, 1, "#e7eaf3");
+        drawTextBlock(
+          ctx,
+          clampShareText(trait, 8),
+          tagX + 16,
+          tagY + 26,
+          (columnWidth - 70) / 2 - 32,
+          24,
+          1,
+          "#e7eaf3",
+        );
       });
 
-      let painTop = personaBottom + 130;
-      ctx.fillStyle = "#ffb07d";
-      ctx.font = "600 20px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      ctx.fillText("典型痛点", leftX + 28, painTop);
-      ctx.font = "400 24px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      strategy.userPersona.painPoints.slice(0, 3).forEach((point, index) => {
-        const lineY = painTop + 42 + index * 42;
-        ctx.fillStyle = "#ff8e55";
-        ctx.beginPath();
-        ctx.arc(leftX + 22, lineY - 7, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#d7dcec";
-        drawTextBlock(ctx, point, leftX + 38, lineY, columnWidth - 60, 30, 1, "#d7dcec");
-      });
-
-      drawRoundedRect(ctx, rightX, lowerTop, columnWidth, 512, 28, "#fffaf2", "#eadfce");
+      drawRoundedRect(ctx, rightX, lowerTop, columnWidth, 430, 28, "#fffaf2", "#eadfce");
       ctx.fillStyle = "#d96d35";
       ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
       ctx.fillText("差异化优势", rightX + 28, lowerTop + 40);
-      ctx.font = "400 26px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      strategy.differentiationAdvantages.slice(0, 4).forEach((point, index) => {
-        const itemY = lowerTop + 94 + index * 92;
-        drawRoundedRect(ctx, rightX + 22, itemY - 28, columnWidth - 44, 68, 22, "#fff", "#f0e4d4");
+      ctx.font = "500 25px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      shareDifferentiators.forEach((point, index) => {
+        const itemY = lowerTop + 92 + index * 84;
+        drawRoundedRect(ctx, rightX + 22, itemY - 28, columnWidth - 44, 62, 20, "#fff", "#f0e4d4");
         ctx.fillStyle = "#202531";
-        drawTextBlock(ctx, point, rightX + 42, itemY + 14, columnWidth - 84, 32, 2, "#202531");
+        drawTextBlock(ctx, point, rightX + 42, itemY + 12, columnWidth - 84, 30, 1, "#202531");
       });
+
+      const summaryTop = lowerTop + 458;
+      drawRoundedRect(
+        ctx,
+        SHARE_CARD_PADDING,
+        summaryTop,
+        SHARE_CARD_WIDTH - SHARE_CARD_PADDING * 2,
+        132,
+        28,
+        "#f6eee2",
+        "#e4d7c6",
+      );
+      ctx.fillStyle = "#6d5d4d";
+      ctx.font = "700 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      ctx.fillText("本次分析带来的价值", SHARE_CARD_PADDING + 28, summaryTop + 42);
+      ctx.fillStyle = "#202531";
+      ctx.font = "500 28px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
+      drawTextBlock(
+        ctx,
+        valueSummary,
+        SHARE_CARD_PADDING + 28,
+        summaryTop + 88,
+        SHARE_CARD_WIDTH - SHARE_CARD_PADDING * 2 - 56,
+        34,
+        2,
+        "#202531",
+      );
 
       ctx.fillStyle = "#7b7368";
       ctx.font = "500 22px 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif";
-      ctx.fillText("适合直接下载发布到小红书封面或图文首页", SHARE_CARD_PADDING, SHARE_CARD_HEIGHT - 108);
+      ctx.fillText("5秒看懂定位，适合直接截图或发布到小红书", SHARE_CARD_PADDING, SHARE_CARD_HEIGHT - 108);
 
       const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob(resolve, "image/png", 1);
