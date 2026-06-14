@@ -9,8 +9,8 @@ type FormState = {
 };
 
 type BrandStudioProps = {
-  openAiConfigured: boolean;
-  openAiMessage: string | null;
+  kimiConfigured: boolean;
+  kimiMessage: string | null;
 };
 
 const initialForm: FormState = {
@@ -203,8 +203,8 @@ function buildValueSummary(strategy: BrandStrategy) {
 }
 
 export function BrandStudio({
-  openAiConfigured,
-  openAiMessage,
+  kimiConfigured,
+  kimiMessage,
 }: BrandStudioProps) {
   const [form, setForm] = useState<FormState>(initialForm);
   const [generatedFrom, setGeneratedFrom] = useState<FormState | null>(null);
@@ -619,7 +619,7 @@ export function BrandStudio({
                 <div className="inline-flex items-center rounded-full border border-[#d8d2c8] bg-[#f7f1e8] px-3 py-1 text-xs font-semibold tracking-[0.18em] text-[#6e6458]">
                   AI品牌定位助手
                 </div>
-                {!openAiConfigured ? (
+                {!kimiConfigured ? (
                   <div className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                     演示模式
                   </div>
@@ -645,9 +645,9 @@ export function BrandStudio({
             </div>
 
             <form className="space-y-4 rounded-[1.75rem] border border-stone-200 bg-[#faf8f3] p-5" onSubmit={handleSubmit}>
-              {!openAiConfigured && openAiMessage ? (
+              {!kimiConfigured && kimiMessage ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                  当前为演示模式。未配置 OpenAI 时，系统会返回一份可体验完整流程的模拟分析结果。
+                  当前为演示模式。未配置 Kimi 时，系统会返回一份可体验完整流程的模拟分析结果。
                 </div>
               ) : null}
 
@@ -720,7 +720,7 @@ export function BrandStudio({
                 <h2 className="mt-2 font-serif text-3xl">你的定位草案</h2>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {!openAiConfigured ? (
+                {!kimiConfigured ? (
                   <div className="rounded-full border border-amber-200/40 bg-amber-50/10 px-3 py-1 text-xs text-amber-100">
                     演示模式
                   </div>

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { NextResponse } from "next/server";
 
 import {
@@ -7,12 +7,12 @@ import {
   type BrandStrategy,
   brandStrategySchema,
 } from "@/lib/brand-schema";
-import { getOpenAiConfigStatus } from "@/lib/env";
+import { getKimiConfigStatus, getKimiBaseUrl } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
+const MODEL = process.env.KIMI_MODEL || "kimi-k2.6";
 
 function pickFirstMatchedSegment(
   description: string,
@@ -112,9 +112,9 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     const input = brandRequestSchema.parse(json);
-    const openAiConfig = getOpenAiConfigStatus();
+    const kimiConfig = getKimiConfigStatus();
 
-    if (!openAiConfig.configured) {
+    if (!kimiConfig.configured) {
       return NextResponse.json({
         demoMode: true,
         strategy: buildMockStrategy(input.brandDescription),
@@ -122,14 +122,13 @@ export async function POST(request: Request) {
     }
 
     const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.KIMI_API_KEY,
+      baseURL: getKimiBaseUrl(),
     });
 
-    const response = await client.responses.parse({
+    const completion = await client.chat.completions.parse({
       model: MODEL,
-      reasoning: { effort: "medium" },
-      store: false,
-      input: [
+      messages: [
         {
           role: "system",
           content: `
@@ -164,19 +163,19 @@ export async function POST(request: Request) {
           `.trim(),
         },
       ],
-      text: {
-        format: zodTextFormat(brandStrategySchema, "brand_strategy"),
-      },
+      response_format: zodResponseFormat(brandStrategySchema, "brand_strategy"),
     });
 
-    if (!response.output_parsed) {
+    const parsedStrategy = completion.choices[0]?.message?.parsed;
+
+    if (!parsedStrategy) {
       return NextResponse.json(
         { error: "模型没有返回符合要求的结构化定位分析结果。" },
         { status: 502 },
       );
     }
 
-    return NextResponse.json({ demoMode: false, strategy: response.output_parsed });
+    return NextResponse.json({ demoMode: false, strategy: parsedStrategy });
   } catch (error) {
     if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json({ error: "请检查表单输入是否完整且格式正确。" }, { status: 400 });

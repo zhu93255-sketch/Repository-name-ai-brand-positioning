@@ -1,13 +1,13 @@
 # Deploy AI Brand Positioning Helper
 
-This app is ready for Vercel deployment once you replace the placeholder OpenAI environment value.
+This app is ready for Vercel deployment once you replace the placeholder Kimi environment value.
 
 ## 1. Create the required key
 
-### OpenAI
+### Kimi
 
-1. Open [OpenAI API keys](https://platform.openai.com/api-keys).
-2. Click **Create new secret key**.
+1. Open [Kimi API Platform](https://platform.kimi.ai/).
+2. Create or open your API key.
 3. Copy the key value.
 
 ## 2. Configure local development
@@ -16,8 +16,9 @@ This app is ready for Vercel deployment once you replace the placeholder OpenAI 
 2. Replace every placeholder value:
 
 ```env
-OPENAI_API_KEY=your_real_openai_key
-OPENAI_MODEL=gpt-5.5
+KIMI_API_KEY=your_real_kimi_key
+KIMI_MODEL=kimi-k2.6
+KIMI_BASE_URL=https://api.moonshot.ai/v1
 ```
 
 3. Restart the dev server after changing env values:
@@ -34,8 +35,9 @@ npm run dev
 4. Confirm the framework is **Next.js**.
 5. Open the **Environment Variables** section before deploying.
 6. Add these variables one by one:
-   - `OPENAI_API_KEY`
-   - `OPENAI_MODEL`
+   - `KIMI_API_KEY`
+   - `KIMI_MODEL`
+   - `KIMI_BASE_URL`
 7. For each variable, paste the same production value you used locally.
 8. Click **Deploy**.
 
@@ -48,5 +50,5 @@ npm run dev
 
 ## 5. Troubleshooting
 
-- If real OpenAI generation does not work, `OPENAI_API_KEY` is still missing or still set to the placeholder value.
+- If real Kimi generation does not work, `KIMI_API_KEY` is still missing or still set to the placeholder value.
 - If Vercel deploys but the app still shows setup warnings, go to **Project Settings** -> **Environment Variables**, update the values, then redeploy.

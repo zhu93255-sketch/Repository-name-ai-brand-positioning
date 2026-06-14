@@ -6,7 +6,7 @@ Single-page Next.js app for turning a short product description into a clearer p
 
 - Next.js
 - Tailwind CSS v4
-- OpenAI API
+- Kimi API (OpenAI compatibility mode)
 - TypeScript
 
 ## Setup
@@ -26,8 +26,9 @@ Single-page Next.js app for turning a short product description into a clearer p
 3. Add your API key to `.env.local`:
 
    ```bash
-   OPENAI_API_KEY=your_openai_api_key_here
-   OPENAI_MODEL=gpt-5.5
+   KIMI_API_KEY=your_kimi_api_key_here
+   KIMI_MODEL=kimi-k2.6
+   KIMI_BASE_URL=https://api.moonshot.ai/v1
    ```
 
 4. Start the app:
