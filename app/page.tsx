@@ -1,13 +1,13 @@
 import { BrandStudio } from "@/components/brand-studio";
-import { getKimiConfigStatus } from "@/lib/env";
+import { getModelConfigStatus } from "@/lib/env";
 
 export default function Page() {
-  const kimiConfig = getKimiConfigStatus();
+  const modelConfig = getModelConfigStatus();
 
   return (
     <BrandStudio
-      kimiConfigured={kimiConfig.configured}
-      kimiMessage={kimiConfig.message}
+      apiConfigured={modelConfig.configured}
+      apiMessage={modelConfig.message}
     />
   );
 }

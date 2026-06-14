@@ -5,13 +5,18 @@ import {
   type BrandStrategy,
   brandStrategySchema,
 } from "@/lib/brand-schema";
-import { getKimiConfigStatus, getKimiBaseUrl } from "@/lib/env";
+import {
+  getModelApiKey,
+  getModelBaseUrl,
+  getModelConfigStatus,
+  getModelName,
+} from "@/lib/env";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = process.env.KIMI_MODEL || "kimi-k2.6";
-const MAX_KIMI_RETRIES = 2;
+const MODEL = getModelName();
+const MAX_PROVIDER_RETRIES = 2;
 
 function pickFirstMatchedSegment(
   description: string,
@@ -62,7 +67,7 @@ function getObjectRecord(value: unknown) {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
-function getKimiErrorMessage(payload: unknown) {
+function getProviderErrorMessage(payload: unknown) {
   const record = getObjectRecord(payload);
   const errorRecord = getObjectRecord(record?.error);
   if (typeof errorRecord?.message === "string" && errorRecord.message.trim()) {
@@ -76,7 +81,7 @@ function getKimiErrorMessage(payload: unknown) {
   return null;
 }
 
-function getKimiMessageContent(payload: unknown) {
+function getProviderMessageContent(payload: unknown) {
   const record = getObjectRecord(payload);
   const choices = Array.isArray(record?.choices) ? record.choices : [];
   const firstChoice = getObjectRecord(choices[0]);
@@ -249,15 +254,15 @@ function normalizeStrategy(candidate: unknown, brandDescription: string): BrandS
   return brandStrategySchema.parse(normalized);
 }
 
-async function requestKimiCompletion(body: string) {
+async function requestModelCompletion(body: string) {
   let lastResponse: Response | null = null;
   let lastJson: unknown = null;
 
-  for (let attempt = 0; attempt <= MAX_KIMI_RETRIES; attempt += 1) {
-    const response = await fetch(`${getKimiBaseUrl()}/chat/completions`, {
+  for (let attempt = 0; attempt <= MAX_PROVIDER_RETRIES; attempt += 1) {
+    const response = await fetch(`${getModelBaseUrl()}/chat/completions`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.KIMI_API_KEY}`,
+        "Authorization": `Bearer ${getModelApiKey()}`,
         "Content-Type": "application/json",
       },
       body,
@@ -277,9 +282,9 @@ async function requestKimiCompletion(body: string) {
       return { response, json };
     }
 
-    const errorMessage = getKimiErrorMessage(json) || undefined;
+    const errorMessage = getProviderErrorMessage(json) || undefined;
 
-    if (response.status !== 429 || attempt === MAX_KIMI_RETRIES) {
+    if (response.status !== 429 || attempt === MAX_PROVIDER_RETRIES) {
       return { response, json };
     }
 
@@ -386,9 +391,9 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     const input = brandRequestSchema.parse(json);
-    const kimiConfig = getKimiConfigStatus();
+    const modelConfig = getModelConfigStatus();
 
-    if (!kimiConfig.configured) {
+    if (!modelConfig.configured) {
       return NextResponse.json({
         demoMode: true,
         strategy: buildMockStrategy(input.brandDescription),
@@ -444,26 +449,26 @@ export async function POST(request: Request) {
       ],
     });
 
-    const { response: completionResponse, json: completionJson } = await requestKimiCompletion(requestBody);
+    const { response: completionResponse, json: completionJson } = await requestModelCompletion(requestBody);
 
     if (!completionResponse) {
       return NextResponse.json(
-        { error: "当前无法连接 Kimi 接口，请稍后再试。" },
+        { error: "当前无法连接 DeepSeek 接口，请稍后再试。" },
         { status: 502 },
       );
     }
 
     if (!completionResponse.ok) {
       const errorMessage =
-        getKimiErrorMessage(completionJson) ||
+        getProviderErrorMessage(completionJson) ||
         (completionResponse.status === 429
           ? "当前请求较多，请稍后 1 到 2 秒再试。"
-          : "Kimi 接口调用失败，请稍后再试。");
+          : "DeepSeek 接口调用失败，请稍后再试。");
 
       return NextResponse.json({ error: errorMessage }, { status: completionResponse.status });
     }
 
-    const rawContent = getKimiMessageContent(completionJson);
+    const rawContent = getProviderMessageContent(completionJson);
 
     if (!rawContent) {
       return NextResponse.json(

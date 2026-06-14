@@ -1,12 +1,12 @@
 # Deploy AI Brand Positioning Helper
 
-This app is ready for Vercel deployment once you replace the placeholder Kimi environment value.
+This app is ready for Vercel deployment once you replace the placeholder DeepSeek environment value.
 
 ## 1. Create the required key
 
-### Kimi
+### DeepSeek
 
-1. Open [Kimi API Platform](https://platform.kimi.ai/).
+1. Open [DeepSeek Platform](https://platform.deepseek.com/).
 2. Create or open your API key.
 3. Copy the key value.
 
@@ -16,9 +16,9 @@ This app is ready for Vercel deployment once you replace the placeholder Kimi en
 2. Replace every placeholder value:
 
 ```env
-KIMI_API_KEY=your_real_kimi_key
-KIMI_MODEL=kimi-k2.6
-KIMI_BASE_URL=https://api.moonshot.cn/v1
+DEEPSEEK_API_KEY=your_real_deepseek_key
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
 3. Restart the dev server after changing env values:
@@ -35,9 +35,9 @@ npm run dev
 4. Confirm the framework is **Next.js**.
 5. Open the **Environment Variables** section before deploying.
 6. Add these variables one by one:
-   - `KIMI_API_KEY`
-   - `KIMI_MODEL`
-   - `KIMI_BASE_URL`
+   - `DEEPSEEK_API_KEY`
+   - `DEEPSEEK_MODEL`
+   - `DEEPSEEK_BASE_URL`
 7. For each variable, paste the same production value you used locally.
 8. Click **Deploy**.
 
@@ -50,5 +50,5 @@ npm run dev
 
 ## 5. Troubleshooting
 
-- If real Kimi generation does not work, `KIMI_API_KEY` is still missing or still set to the placeholder value.
+- If real DeepSeek generation does not work, `DEEPSEEK_API_KEY` is still missing or still set to the placeholder value.
 - If Vercel deploys but the app still shows setup warnings, go to **Project Settings** -> **Environment Variables**, update the values, then redeploy.

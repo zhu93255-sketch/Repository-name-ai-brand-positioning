@@ -6,7 +6,7 @@ Single-page Next.js app for turning a short product description into a clearer p
 
 - Next.js
 - Tailwind CSS v4
-- Kimi API (OpenAI compatibility mode)
+- DeepSeek API (OpenAI compatibility mode)
 - TypeScript
 
 ## Setup
@@ -26,9 +26,9 @@ Single-page Next.js app for turning a short product description into a clearer p
 3. Add your API key to `.env.local`:
 
    ```bash
-   KIMI_API_KEY=your_kimi_api_key_here
-   KIMI_MODEL=kimi-k2.6
-   KIMI_BASE_URL=https://api.moonshot.cn/v1
+   DEEPSEEK_API_KEY=your_deepseek_api_key_here
+   DEEPSEEK_MODEL=deepseek-v4-flash
+   DEEPSEEK_BASE_URL=https://api.deepseek.com
    ```
 
 4. Start the app:
