@@ -29,6 +29,171 @@ function clampByCharacters(text: string, maxChars: number) {
   return chars.slice(0, maxChars).join("");
 }
 
+function extractMessageContent(content: unknown) {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item && typeof item === "object" && "text" in item && typeof item.text === "string") {
+          return item.text;
+        }
+
+        return "";
+      })
+      .join("\n")
+      .trim();
+  }
+
+  return "";
+}
+
+function extractJsonObject(rawText: string) {
+  const cleaned = rawText
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    let depth = 0;
+    let start = -1;
+
+    for (let index = 0; index < cleaned.length; index += 1) {
+      const char = cleaned[index];
+      if (char === "{") {
+        if (depth === 0) {
+          start = index;
+        }
+        depth += 1;
+      } else if (char === "}") {
+        depth -= 1;
+        if (depth === 0 && start >= 0) {
+          const segment = cleaned.slice(start, index + 1);
+          return JSON.parse(segment);
+        }
+      }
+    }
+  }
+
+  throw new Error("模型没有返回可解析的 JSON。");
+}
+
+function normalizeText(value: unknown, fallback: string, maxChars?: number) {
+  const text = typeof value === "string" ? value.trim() : "";
+  const safeText = text || fallback;
+  return typeof maxChars === "number" ? clampByCharacters(safeText, maxChars) : safeText;
+}
+
+function normalizeTextList(value: unknown, fallback: string[], minItems: number, maxItems: number, maxChars: number) {
+  const list = Array.isArray(value)
+    ? value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean)
+        .map((item) => clampByCharacters(item, maxChars))
+    : [];
+
+  const merged = [...list];
+  for (const item of fallback) {
+    if (merged.length >= maxItems) {
+      break;
+    }
+    if (!merged.includes(item)) {
+      merged.push(clampByCharacters(item, maxChars));
+    }
+  }
+
+  return merged.slice(0, Math.max(minItems, maxItems)).slice(0, maxItems);
+}
+
+function normalizeStrategy(candidate: unknown, brandDescription: string): BrandStrategy {
+  const fallback = buildMockStrategy(brandDescription);
+  const source = candidate && typeof candidate === "object" ? candidate : {};
+  const sourceRecord = source as Record<string, unknown>;
+  const sourcePersona =
+    sourceRecord.userPersona && typeof sourceRecord.userPersona === "object"
+      ? (sourceRecord.userPersona as Record<string, unknown>)
+      : {};
+
+  const sourceDirections = Array.isArray(sourceRecord.xiaohongshuContentDirections)
+    ? sourceRecord.xiaohongshuContentDirections
+    : [];
+
+  const normalized: BrandStrategy = {
+    oneSentencePitch: normalizeText(
+      sourceRecord.oneSentencePitch,
+      fallback.oneSentencePitch,
+      30,
+    ),
+    brandPositioning: normalizeText(sourceRecord.brandPositioning, fallback.brandPositioning),
+    coreSellingPoints: normalizeTextList(
+      sourceRecord.coreSellingPoints,
+      fallback.coreSellingPoints,
+      3,
+      5,
+      32,
+    ),
+    userPersona: {
+      summary: normalizeText(sourcePersona.summary, fallback.userPersona.summary),
+      traits: normalizeTextList(sourcePersona.traits, fallback.userPersona.traits, 3, 5, 18),
+      painPoints: normalizeTextList(
+        sourcePersona.painPoints,
+        fallback.userPersona.painPoints,
+        3,
+        5,
+        30,
+      ),
+    },
+    differentiationAdvantages: normalizeTextList(
+      sourceRecord.differentiationAdvantages,
+      fallback.differentiationAdvantages,
+      3,
+      5,
+      30,
+    ),
+    xiaohongshuContentDirections: sourceDirections
+      .map((item, index) => {
+        const fallbackDirection =
+          fallback.xiaohongshuContentDirections[index] ||
+          fallback.xiaohongshuContentDirections[fallback.xiaohongshuContentDirections.length - 1];
+        const record = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+
+        return {
+          title: normalizeText(record.title, fallbackDirection.title, 20),
+          description: normalizeText(record.description, fallbackDirection.description, 80),
+          exampleTopics: normalizeTextList(
+            record.exampleTopics,
+            fallbackDirection.exampleTopics,
+            2,
+            3,
+            28,
+          ),
+        };
+      })
+      .filter((item) => item.title && item.description)
+      .slice(0, 5),
+  };
+
+  if (normalized.xiaohongshuContentDirections.length < 3) {
+    normalized.xiaohongshuContentDirections = fallback.xiaohongshuContentDirections;
+  }
+
+  if (Array.from(normalized.oneSentencePitch).length < 15) {
+    normalized.oneSentencePitch = fallback.oneSentencePitch;
+  }
+
+  return brandStrategySchema.parse(normalized);
+}
+
 function buildMockStrategy(brandDescription: string): BrandStrategy {
   const description = brandDescription.trim();
   const lowerDescription = description.toLowerCase();
@@ -202,9 +367,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: errorMessage }, { status: completionResponse.status });
     }
 
-    const rawContent = completionJson?.choices?.[0]?.message?.content;
+    const rawContent = extractMessageContent(completionJson?.choices?.[0]?.message?.content);
 
-    if (typeof rawContent !== "string") {
+    if (!rawContent) {
       return NextResponse.json(
         { error: "模型没有返回可解析的文本结果。" },
         { status: 502 },
@@ -214,7 +379,7 @@ export async function POST(request: Request) {
     let parsedStrategy: BrandStrategy;
 
     try {
-      parsedStrategy = brandStrategySchema.parse(JSON.parse(rawContent));
+      parsedStrategy = normalizeStrategy(extractJsonObject(rawContent), input.brandDescription);
     } catch {
       return NextResponse.json(
         { error: "模型没有返回符合要求的结构化定位分析结果。" },
