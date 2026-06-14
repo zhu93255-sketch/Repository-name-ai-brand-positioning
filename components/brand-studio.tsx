@@ -268,6 +268,9 @@ export function BrandStudio({
     }
 
     const copyText = [
+      "一句话概括",
+      strategy.oneSentencePitch,
+      "",
       "品牌定位",
       strategy.brandPositioning,
       "",
@@ -431,7 +434,7 @@ export function BrandStudio({
       const columnWidth = SHARE_CARD_WIDTH / 2 - SHARE_CARD_PADDING - 26;
       const positioningText = pickShortPositioning(strategy);
       const positioningTags = buildPositioningTags(strategy);
-      const coreInsight = buildCoreInsight(strategy);
+      const coreInsight = clampShareText(strategy.oneSentencePitch, 30) || buildCoreInsight(strategy);
       const shareSellingPoints = buildShareSellingPoints(strategy);
       const sharePersonaSummary = buildSharePersonaSummary(strategy);
       const shareDifferentiators = buildShareDifferentiators(strategy);
@@ -733,6 +736,13 @@ export function BrandStudio({
 
             {strategy ? (
               <div className="mt-5 flex flex-1 flex-col gap-4 overflow-hidden">
+                <div className="rounded-3xl bg-white/[0.04] p-4">
+                  <p className="text-xs font-semibold tracking-[0.18em] text-orange-200/90">一句话定位</p>
+                  <p className="mt-2 text-lg font-semibold leading-8 text-white">
+                    {strategy.oneSentencePitch}
+                  </p>
+                </div>
+
                 <div className="rounded-3xl bg-white/[0.04] p-4">
                   <p className="text-xs font-semibold tracking-[0.18em] text-orange-200/90">品牌定位</p>
                   <p className="mt-2 text-sm leading-7 text-white/90">{strategy.brandPositioning}</p>

@@ -13,6 +13,7 @@ export const feedbackVoteSchema = z.object({
 });
 
 export const brandStrategySchema = z.object({
+  oneSentencePitch: z.string().min(15).max(30),
   brandPositioning: z.string().min(1),
   coreSellingPoints: z.array(z.string().min(1)).min(3).max(5),
   userPersona: z.object({

@@ -20,9 +20,24 @@ function pickFirstMatchedSegment(
   return patterns.find((item) => description.includes(item)) || fallback;
 }
 
+function clampByCharacters(text: string, maxChars: number) {
+  const chars = Array.from(text.trim());
+  if (chars.length <= maxChars) {
+    return chars.join("");
+  }
+
+  return chars.slice(0, maxChars).join("");
+}
+
 function buildMockStrategy(brandDescription: string): BrandStrategy {
   const description = brandDescription.trim();
   const lowerDescription = description.toLowerCase();
+  const shortAudience =
+    pickFirstMatchedSegment(
+      description,
+      ["创业团队", "创始人", "老板", "主理人", "团队", "女生", "妈妈", "学生", "商家", "品牌方"],
+      "创业团队",
+    );
 
   const audience =
     pickFirstMatchedSegment(
@@ -46,6 +61,7 @@ function buildMockStrategy(brandDescription: string): BrandStrategy {
         : "更直接的结果价值";
 
   return {
+    oneSentencePitch: clampByCharacters(`帮助${shortAudience}更快获得${emphasis}的${category}工具`, 30),
     brandPositioning: `这是一个面向${audience}的${category}品牌，核心不是泛泛提供功能，而是用更清晰、更可感知的方式帮助用户获得${emphasis}，在用户心中占据“更快见效、更容易决策”的位置。`,
     coreSellingPoints: [
       "把复杂能力包装成用户一听就懂的结果承诺",
@@ -140,6 +156,10 @@ export async function POST(request: Request) {
 所有结果都请使用简体中文。
 
 输出要求：
+- oneSentencePitch：用一句 15 到 30 字的话概括品牌价值。
+- oneSentencePitch 必须同时体现目标用户和产品价值。
+- oneSentencePitch 用户看完可直接用于微信简介、官网标题、路演介绍、小红书主页简介。
+- oneSentencePitch 不要使用空话、套话，不要出现“赋能”“一站式”“全方位”这类泛化表达。
 - brandPositioning：1 段话，说清这个品牌应该占据什么位置。
 - coreSellingPoints：3 到 5 条，可直接用于首页、海报或销售沟通。
 - userPersona.summary：1 段话概括目标用户是谁。
@@ -158,11 +178,13 @@ export async function POST(request: Request) {
 品牌描述：${input.brandDescription}
 
 请输出一份适合中国创业者使用的品牌定位分析，重点帮这个品牌找到：
-1. 品牌定位
-2. 核心卖点
-3. 用户画像
-4. 差异化优势
-5. 小红书内容方向
+1. 一句话价值概括
+2. 品牌定位
+3. 核心卖点
+4. 用户画像
+5. 差异化优势
+6. 小红书内容方向
+其中“一句话价值概括”必须让用户看完就知道：这是给谁的，值在哪里。
           `.trim(),
           },
         ],
