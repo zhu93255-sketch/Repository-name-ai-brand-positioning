@@ -11,6 +11,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MODEL = process.env.KIMI_MODEL || "kimi-k2.6";
+const MAX_KIMI_RETRIES = 2;
 
 function pickFirstMatchedSegment(
   description: string,
@@ -27,6 +28,60 @@ function clampByCharacters(text: string, maxChars: number) {
   }
 
   return chars.slice(0, maxChars).join("");
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function pickRetryDelayMs(response: Response, errorMessage?: string) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+  }
+
+  const matchedSeconds = errorMessage?.match(/after\s+(\d+)\s+seconds?/i);
+  if (matchedSeconds) {
+    return Number(matchedSeconds[1]) * 1000;
+  }
+
+  const matchedSecond = errorMessage?.match(/after\s+(\d+)\s+second/i);
+  if (matchedSecond) {
+    return Number(matchedSecond[1]) * 1000;
+  }
+
+  return 1200;
+}
+
+function getObjectRecord(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function getKimiErrorMessage(payload: unknown) {
+  const record = getObjectRecord(payload);
+  const errorRecord = getObjectRecord(record?.error);
+  if (typeof errorRecord?.message === "string" && errorRecord.message.trim()) {
+    return errorRecord.message.trim();
+  }
+
+  if (typeof record?.message === "string" && record.message.trim()) {
+    return record.message.trim();
+  }
+
+  return null;
+}
+
+function getKimiMessageContent(payload: unknown) {
+  const record = getObjectRecord(payload);
+  const choices = Array.isArray(record?.choices) ? record.choices : [];
+  const firstChoice = getObjectRecord(choices[0]);
+  const message = getObjectRecord(firstChoice?.message);
+  return extractMessageContent(message?.content);
 }
 
 function extractMessageContent(content: unknown) {
@@ -194,6 +249,46 @@ function normalizeStrategy(candidate: unknown, brandDescription: string): BrandS
   return brandStrategySchema.parse(normalized);
 }
 
+async function requestKimiCompletion(body: string) {
+  let lastResponse: Response | null = null;
+  let lastJson: unknown = null;
+
+  for (let attempt = 0; attempt <= MAX_KIMI_RETRIES; attempt += 1) {
+    const response = await fetch(`${getKimiBaseUrl()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.KIMI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    let json: unknown = null;
+    try {
+      json = await response.json();
+    } catch {
+      json = null;
+    }
+
+    lastResponse = response;
+    lastJson = json;
+
+    if (response.ok) {
+      return { response, json };
+    }
+
+    const errorMessage = getKimiErrorMessage(json) || undefined;
+
+    if (response.status !== 429 || attempt === MAX_KIMI_RETRIES) {
+      return { response, json };
+    }
+
+    await sleep(pickRetryDelayMs(response, errorMessage));
+  }
+
+  return { response: lastResponse, json: lastJson };
+}
+
 function buildMockStrategy(brandDescription: string): BrandStrategy {
   const description = brandDescription.trim();
   const lowerDescription = description.toLowerCase();
@@ -300,21 +395,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const completionResponse = await fetch(`${getKimiBaseUrl()}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.KIMI_API_KEY}`,
-        "Content-Type": "application/json",
+    const requestBody = JSON.stringify({
+      model: MODEL,
+      response_format: {
+        type: "json_object",
       },
-      body: JSON.stringify({
-        model: MODEL,
-        response_format: {
-          type: "json_object",
-        },
-        messages: [
-          {
-            role: "system",
-            content: `
+      messages: [
+        {
+          role: "system",
+          content: `
 你是一位擅长服务中国创业者和新消费品牌的资深品牌定位顾问。
 请基于用户提供的品牌信息，输出能直接用于传播和市场验证的定位建议。
 语言必须简洁、具体、像真正的操盘手建议，避免空话、套话和 AI 腔。
@@ -336,10 +425,10 @@ export async function POST(request: Request) {
 - exampleTopics 提供 2 到 3 个可直接拿去写笔记的选题。
 请只返回严格合法的 JSON 对象，不要包含 Markdown、解释文字或代码块。
           `.trim(),
-          },
-          {
-            role: "user",
-            content: `
+        },
+        {
+          role: "user",
+          content: `
 品牌描述：${input.brandDescription}
 
 请输出一份适合中国创业者使用的品牌定位分析，重点帮这个品牌找到：
@@ -351,23 +440,30 @@ export async function POST(request: Request) {
 6. 小红书内容方向
 其中“一句话价值概括”必须让用户看完就知道：这是给谁的，值在哪里。
           `.trim(),
-          },
-        ],
-      }),
+        },
+      ],
     });
 
-    const completionJson = await completionResponse.json();
+    const { response: completionResponse, json: completionJson } = await requestKimiCompletion(requestBody);
+
+    if (!completionResponse) {
+      return NextResponse.json(
+        { error: "当前无法连接 Kimi 接口，请稍后再试。" },
+        { status: 502 },
+      );
+    }
 
     if (!completionResponse.ok) {
       const errorMessage =
-        completionJson?.error?.message ||
-        completionJson?.message ||
-        "Kimi 接口调用失败，请稍后再试。";
+        getKimiErrorMessage(completionJson) ||
+        (completionResponse.status === 429
+          ? "当前请求较多，请稍后 1 到 2 秒再试。"
+          : "Kimi 接口调用失败，请稍后再试。");
 
       return NextResponse.json({ error: errorMessage }, { status: completionResponse.status });
     }
 
-    const rawContent = extractMessageContent(completionJson?.choices?.[0]?.message?.content);
+    const rawContent = getKimiMessageContent(completionJson);
 
     if (!rawContent) {
       return NextResponse.json(

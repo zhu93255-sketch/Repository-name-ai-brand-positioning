@@ -13,6 +13,11 @@ type BrandStudioProps = {
   kimiMessage: string | null;
 };
 
+type BrandStrategyResponse = {
+  error?: string;
+  strategy?: BrandStrategy;
+};
+
 const initialForm: FormState = {
   brandDescription: "",
 };
@@ -57,6 +62,20 @@ const exampleInputs = [
 const SHARE_CARD_WIDTH = 1200;
 const SHARE_CARD_HEIGHT = 1500;
 const SHARE_CARD_PADDING = 64;
+
+async function readJsonSafely<T>(response: Response) {
+  const rawText = await response.text();
+
+  if (!rawText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    return rawText as T;
+  }
+}
 
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
@@ -257,13 +276,20 @@ export function BrandStudio({
         body: JSON.stringify(form),
       });
 
-      const data = (await response.json()) as {
-        error?: string;
-        strategy?: BrandStrategy;
-      };
+      const payload = await readJsonSafely<BrandStrategyResponse | string>(response);
+      const data =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? (payload as BrandStrategyResponse)
+          : null;
 
-      if (!response.ok || !data.strategy) {
-        throw new Error(data.error || "当前无法生成定位分析，请稍后再试。");
+      if (!response.ok || !data?.strategy) {
+        const fallbackMessage =
+          typeof payload === "string" && payload.trim().length > 0
+            ? payload.trim()
+            : response.status === 429
+              ? "当前请求较多，请稍后 1 到 2 秒再试。"
+              : "当前无法生成定位分析，请稍后再试。";
+        throw new Error(data?.error || fallbackMessage);
       }
 
       setStrategy(data.strategy);
