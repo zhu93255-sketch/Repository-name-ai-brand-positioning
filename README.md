@@ -28,7 +28,7 @@ Single-page Next.js app for turning a short product description into a clearer p
    ```bash
    KIMI_API_KEY=your_kimi_api_key_here
    KIMI_MODEL=kimi-k2.6
-   KIMI_BASE_URL=https://api.moonshot.ai/v1
+   KIMI_BASE_URL=https://api.moonshot.cn/v1
    ```
 
 4. Start the app:

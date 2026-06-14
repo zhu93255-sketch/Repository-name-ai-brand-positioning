@@ -2,7 +2,7 @@ const PLACEHOLDER_VALUES = new Set([
   "",
   "your_kimi_api_key_here",
   "replace_with_kimi_api_key",
-  "https://api.moonshot.ai/v1",
+  "https://api.moonshot.cn/v1",
 ]);
 
 function hasConfiguredValue(value: string | undefined) {
@@ -22,5 +22,5 @@ export function getKimiConfigStatus() {
 
 export function getKimiBaseUrl() {
   const baseUrl = process.env.KIMI_BASE_URL?.trim();
-  return baseUrl && baseUrl.length > 0 ? baseUrl : "https://api.moonshot.ai/v1";
+  return baseUrl && baseUrl.length > 0 ? baseUrl : "https://api.moonshot.cn/v1";
 }

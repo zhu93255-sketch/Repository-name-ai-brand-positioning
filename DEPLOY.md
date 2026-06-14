@@ -18,7 +18,7 @@ This app is ready for Vercel deployment once you replace the placeholder Kimi en
 ```env
 KIMI_API_KEY=your_real_kimi_key
 KIMI_MODEL=kimi-k2.6
-KIMI_BASE_URL=https://api.moonshot.ai/v1
+KIMI_BASE_URL=https://api.moonshot.cn/v1
 ```
 
 3. Restart the dev server after changing env values:

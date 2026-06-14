@@ -1,5 +1,3 @@
-import OpenAI from "openai";
-import { zodResponseFormat } from "openai/helpers/zod";
 import { NextResponse } from "next/server";
 
 import {
@@ -121,17 +119,21 @@ export async function POST(request: Request) {
       });
     }
 
-    const client = new OpenAI({
-      apiKey: process.env.KIMI_API_KEY,
-      baseURL: getKimiBaseUrl(),
-    });
-
-    const completion = await client.chat.completions.parse({
-      model: MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `
+    const completionResponse = await fetch(`${getKimiBaseUrl()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.KIMI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        response_format: {
+          type: "json_object",
+        },
+        messages: [
+          {
+            role: "system",
+            content: `
 你是一位擅长服务中国创业者和新消费品牌的资深品牌定位顾问。
 请基于用户提供的品牌信息，输出能直接用于传播和市场验证的定位建议。
 语言必须简洁、具体、像真正的操盘手建议，避免空话、套话和 AI 腔。
@@ -147,11 +149,12 @@ export async function POST(request: Request) {
 - xiaohongshuContentDirections：3 到 5 个小红书内容方向。
 - 每个小红书内容方向都要包含 title、description、exampleTopics。
 - exampleTopics 提供 2 到 3 个可直接拿去写笔记的选题。
+请只返回严格合法的 JSON 对象，不要包含 Markdown、解释文字或代码块。
           `.trim(),
-        },
-        {
-          role: "user",
-          content: `
+          },
+          {
+            role: "user",
+            content: `
 品牌描述：${input.brandDescription}
 
 请输出一份适合中国创业者使用的品牌定位分析，重点帮这个品牌找到：
@@ -161,12 +164,41 @@ export async function POST(request: Request) {
 4. 差异化优势
 5. 小红书内容方向
           `.trim(),
-        },
-      ],
-      response_format: zodResponseFormat(brandStrategySchema, "brand_strategy"),
+          },
+        ],
+      }),
     });
 
-    const parsedStrategy = completion.choices[0]?.message?.parsed;
+    const completionJson = await completionResponse.json();
+
+    if (!completionResponse.ok) {
+      const errorMessage =
+        completionJson?.error?.message ||
+        completionJson?.message ||
+        "Kimi 接口调用失败，请稍后再试。";
+
+      return NextResponse.json({ error: errorMessage }, { status: completionResponse.status });
+    }
+
+    const rawContent = completionJson?.choices?.[0]?.message?.content;
+
+    if (typeof rawContent !== "string") {
+      return NextResponse.json(
+        { error: "模型没有返回可解析的文本结果。" },
+        { status: 502 },
+      );
+    }
+
+    let parsedStrategy: BrandStrategy;
+
+    try {
+      parsedStrategy = brandStrategySchema.parse(JSON.parse(rawContent));
+    } catch {
+      return NextResponse.json(
+        { error: "模型没有返回符合要求的结构化定位分析结果。" },
+        { status: 502 },
+      );
+    }
 
     if (!parsedStrategy) {
       return NextResponse.json(
